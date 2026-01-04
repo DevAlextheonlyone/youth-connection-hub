@@ -20,26 +20,22 @@ export default function ChannelPage() {
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
 
+  // 🔹 Hämta posts första gången
   useEffect(() => {
     async function load() {
-      // kräver inloggning
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
         router.push('/login')
         return
       }
 
-      // hämta posts
       const { data, error } = await supabase
         .from('posts')
         .select('*')
         .eq('channel_id', channelId)
         .order('created_at', { ascending: false })
 
-      if (error) {
-        console.error(error)
-      }
-
+      if (error) console.error(error)
       setPosts(data || [])
       setLoading(false)
     }
@@ -47,27 +43,45 @@ export default function ChannelPage() {
     if (channelId) load()
   }, [channelId, router])
 
+  // 🔥 REALTIME – lyssna på nya posts
+  useEffect(() => {
+    if (!channelId) return
+
+    const realtimeChannel = supabase
+      .channel(`posts-${channelId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'posts',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        payload => {
+          setPosts(prev => [payload.new as Post, ...prev])
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(realtimeChannel)
+    }
+  }, [channelId])
+
   async function createPost() {
     if (!content.trim()) return
 
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
 
-    const { error } = await supabase.from('posts').insert({
+    await supabase.from('posts').insert({
       channel_id: channelId,
       user_id: session.user.id,
       content,
     })
 
-    if (!error) {
-      setContent('')
-      const { data } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('channel_id', channelId)
-        .order('created_at', { ascending: false })
-      setPosts(data || [])
-    }
+    setContent('')
+    // ❌ INGEN refetch här – realtime sköter det
   }
 
   if (loading) return <p style={{ padding: 20 }}>Loading…</p>
@@ -76,7 +90,6 @@ export default function ChannelPage() {
     <main style={{ maxWidth: 800, margin: '40px auto' }}>
       <h2>Posts</h2>
 
-      {/* create post */}
       <div style={{ marginBottom: 20 }}>
         <textarea
           placeholder="Write something…"
@@ -89,7 +102,6 @@ export default function ChannelPage() {
         </button>
       </div>
 
-      {/* posts list */}
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {posts.map(post => (
           <li
