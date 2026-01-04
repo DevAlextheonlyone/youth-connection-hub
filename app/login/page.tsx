@@ -49,6 +49,10 @@ export default function LoginPage() {
     <main style={{ maxWidth: 400, margin: '100px auto', textAlign: 'center' }}>
       <h1>Youth Connection Hub</h1>
 
+      <p style={{ color: '#666', marginBottom: 30 }}>
+        Login or create an account to continue
+      </p>
+
       <input
         placeholder="Email"
         value={email}
@@ -93,6 +97,29 @@ export default function LoginPage() {
       >
         Forgot password?
       </button>
+
+      {/* Discord support */}
+      <div style={{ marginTop: 40 }}>
+        <p style={{ marginBottom: 10, color: '#666' }}>
+          Need help or support?
+        </p>
+        <a
+          href="https://discord.gg/ptm4PrDUrB"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-block',
+            padding: '10px 20px',
+            background: '#5865F2',
+            color: '#fff',
+            borderRadius: 6,
+            textDecoration: 'none',
+            fontWeight: 'bold',
+          }}
+        >
+          Join our Discord
+        </a>
+      </div>
     </main>
   )
 }
