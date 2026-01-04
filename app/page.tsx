@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 type Area = {
@@ -18,7 +18,6 @@ export default function HomePage() {
   useEffect(() => {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession()
-
       if (!session) {
         router.push('/login')
         return
@@ -26,12 +25,13 @@ export default function HomePage() {
 
       const { data, error } = await supabase
         .from('areas')
-        .select('*')
+        .select('id, name')
         .order('created_at', { ascending: true })
 
       if (error) {
-        console.error(error)
+        console.error('AREAS ERROR', error)
       } else {
+        console.log('AREAS DATA', data)
         setAreas(data || [])
       }
 
@@ -41,21 +41,16 @@ export default function HomePage() {
     load()
   }, [router])
 
-  if (loading) {
-    return <p style={{ padding: 20 }}>Loading…</p>
-  }
+  if (loading) return <p style={{ padding: 20 }}>Loading…</p>
 
   return (
     <main style={{ maxWidth: 800, margin: '40px auto' }}>
       <h1>Youth Connection Hub</h1>
-      <p style={{ color: '#666' }}>
-        Choose a category to start discussing
-      </p>
 
-      <ul style={{ listStyle: 'none', padding: 0, marginTop: 30 }}>
+      <ul style={{ listStyle: 'none', padding: 0 }}>
         {areas.map(area => (
           <li key={area.id} style={{ marginBottom: 12 }}>
-            {/* 🔴 VIKTIGT: vi länkar med ID, inte namn */}
+            {/* 🔥 HÄR ÄR DET VIKTIGA */}
             <Link
               href={`/area/${area.id}`}
               style={{
@@ -63,9 +58,9 @@ export default function HomePage() {
                 padding: 16,
                 border: '1px solid #ddd',
                 borderRadius: 8,
+                fontWeight: 'bold',
                 textDecoration: 'none',
                 color: '#000',
-                fontWeight: 'bold',
               }}
             >
               {area.name}
