@@ -7,6 +7,7 @@ import { useRouter, useParams } from 'next/navigation'
 type Post = {
   id: string
   content: string
+  image_url: string | null
   created_at: string
   user_id: string
 }
@@ -18,9 +19,9 @@ export default function ChannelPage() {
 
   const [posts, setPosts] = useState<Post[]>([])
   const [content, setContent] = useState('')
+  const [image, setImage] = useState<File | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // 🔹 Hämta posts första gången
   useEffect(() => {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession()
@@ -29,13 +30,12 @@ export default function ChannelPage() {
         return
       }
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('posts')
         .select('*')
         .eq('channel_id', channelId)
         .order('created_at', { ascending: false })
 
-      if (error) console.error(error)
       setPosts(data || [])
       setLoading(false)
     }
@@ -43,11 +43,11 @@ export default function ChannelPage() {
     if (channelId) load()
   }, [channelId, router])
 
-  // 🔥 REALTIME – lyssna på nya posts
+  // 🔥 realtime
   useEffect(() => {
     if (!channelId) return
 
-    const realtimeChannel = supabase
+    const channel = supabase
       .channel(`posts-${channelId}`)
       .on(
         'postgres_changes',
@@ -64,24 +64,43 @@ export default function ChannelPage() {
       .subscribe()
 
     return () => {
-      supabase.removeChannel(realtimeChannel)
+      supabase.removeChannel(channel)
     }
   }, [channelId])
 
   async function createPost() {
-    if (!content.trim()) return
+    if (!content.trim() && !image) return
 
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
+
+    let imageUrl: string | null = null
+
+    if (image) {
+      const fileExt = image.name.split('.').pop()
+      const fileName = `${crypto.randomUUID()}.${fileExt}`
+
+      const { error } = await supabase.storage
+        .from('images')
+        .upload(fileName, image)
+
+      if (!error) {
+        const { data } = supabase.storage
+          .from('images')
+          .getPublicUrl(fileName)
+        imageUrl = data.publicUrl
+      }
+    }
 
     await supabase.from('posts').insert({
       channel_id: channelId,
       user_id: session.user.id,
       content,
+      image_url: imageUrl,
     })
 
     setContent('')
-    // ❌ INGEN refetch här – realtime sköter det
+    setImage(null)
   }
 
   if (loading) return <p style={{ padding: 20 }}>Loading…</p>
@@ -97,6 +116,13 @@ export default function ChannelPage() {
           onChange={e => setContent(e.target.value)}
           style={{ width: '100%', minHeight: 80, padding: 10 }}
         />
+
+        <input
+          type="file"
+          accept="image/*"
+          onChange={e => setImage(e.target.files?.[0] || null)}
+        />
+
         <button onClick={createPost} style={{ marginTop: 8 }}>
           Post
         </button>
@@ -108,7 +134,16 @@ export default function ChannelPage() {
             key={post.id}
             style={{ borderBottom: '1px solid #eee', padding: '10px 0' }}
           >
-            <p style={{ margin: 0 }}>{post.content}</p>
+            <p>{post.content}</p>
+
+            {post.image_url && (
+              <img
+                src={post.image_url}
+                alt="Post image"
+                style={{ maxWidth: '100%', marginTop: 8, borderRadius: 6 }}
+              />
+            )}
+
             <small style={{ color: '#888' }}>
               {new Date(post.created_at).toLocaleString()}
             </small>
