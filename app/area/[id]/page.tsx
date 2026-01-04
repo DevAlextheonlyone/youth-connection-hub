@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { createSupabaseServer } from '@/lib/supabase-server'
 
 export default async function AreaPage({
@@ -8,52 +7,27 @@ export default async function AreaPage({
 }) {
   const supabase = createSupabaseServer()
 
-  const { data: area } = await supabase
+  const areaResult = await supabase
     .from('areas')
     .select('*')
     .eq('id', params.id)
-    .single()
 
-  const { data: channels } = await supabase
+  const channelsResult = await supabase
     .from('channels')
     .select('*')
     .eq('area_id', params.id)
-    .order('created_at')
-
-  if (!area) {
-    return <p>Area not found</p>
-  }
 
   return (
-    <main style={{ maxWidth: 800, margin: '60px auto' }}>
-      <h1>{area.name}</h1>
-      <p style={{ color: '#666', marginBottom: 30 }}>
-        Choose a channel
-      </p>
-
-      {!channels || channels.length === 0 ? (
-        <p>No channels yet.</p>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {channels.map(channel => (
-            <li key={channel.id} style={{ marginBottom: 15 }}>
-              <Link
-                href={`/channel/${channel.id}`}
-                style={{
-                  display: 'block',
-                  padding: 16,
-                  border: '1px solid #ddd',
-                  borderRadius: 8,
-                  textDecoration: 'none',
-                  color: '#000',
-                }}
-              >
-                #{channel.name}
-              </Link>
-            </li>
-          ))}
-        </ul>
+    <pre style={{ whiteSpace: 'pre-wrap', padding: 20 }}>
+      {JSON.stringify(
+        {
+          paramsId: params.id,
+          areaResult,
+          channelsResult,
+        },
+        null,
+        2
       )}
-    </main>
+    </pre>
   )
 }
