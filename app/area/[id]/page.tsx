@@ -12,7 +12,7 @@ type Channel = {
 
 export default function AreaPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const [channels, setChannels] = useState<Channel[]>([])
+  const [channels, setChannels] = useState<Channel[] | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -30,10 +30,12 @@ export default function AreaPage({ params }: { params: { id: string } }) {
         .order('created_at', { ascending: true })
 
       if (error) {
-        console.error(error)
+        console.error('CHANNEL ERROR', error)
       }
 
-      setChannels(data || [])
+      console.log('CHANNEL DATA', data)
+
+      setChannels(data ?? [])
       setLoading(false)
     }
 
@@ -48,29 +50,31 @@ export default function AreaPage({ params }: { params: { id: string } }) {
     <main style={{ maxWidth: 800, margin: '40px auto' }}>
       <h2>Channels</h2>
 
-      {channels.length === 0 && (
+      {channels && channels.length === 0 && (
         <p style={{ color: '#777' }}>No channels found</p>
       )}
 
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {channels.map(channel => (
-          <li key={channel.id} style={{ marginBottom: 12 }}>
-            <Link
-              href={`/channel/${channel.id}`}
-              style={{
-                display: 'block',
-                padding: 16,
-                border: '1px solid #ddd',
-                borderRadius: 8,
-                textDecoration: 'none',
-                fontWeight: 'bold',
-              }}
-            >
-              {channel.name}
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {channels && channels.length > 0 && (
+        <ul style={{ listStyle: 'none', padding: 0 }}>
+          {channels.map(channel => (
+            <li key={channel.id} style={{ marginBottom: 12 }}>
+              <Link
+                href={`/channel/${channel.id}`}
+                style={{
+                  display: 'block',
+                  padding: 16,
+                  border: '1px solid #ddd',
+                  borderRadius: 8,
+                  textDecoration: 'none',
+                  fontWeight: 'bold',
+                }}
+              >
+                {channel.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </main>
   )
 }
