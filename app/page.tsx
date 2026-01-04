@@ -1,13 +1,19 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { createSupabaseServer } from '@/lib/supabase-server'
 
-export default async function HomePage() {
-  const supabase = createSupabaseServer()
+export default function HomePage() {
+  const [areas, setAreas] = useState<any[]>([])
 
-  const { data: areas } = await supabase
-    .from('areas')
-    .select('*')
-    .order('created_at')
+  useEffect(() => {
+    supabase
+      .from('areas')
+      .select('*')
+      .order('created_at')
+      .then(({ data }) => setAreas(data || []))
+  }, [])
 
   return (
     <main style={{ maxWidth: 800, margin: '60px auto' }}>
@@ -16,7 +22,7 @@ export default async function HomePage() {
         Choose a category to start discussing
       </p>
 
-      {!areas || areas.length === 0 ? (
+      {areas.length === 0 ? (
         <p>No areas created yet.</p>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0 }}>
