@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 type Channel = {
   id: string
@@ -17,33 +17,23 @@ export default function AreaPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     async function load() {
-      // 1️⃣ kräver inloggning
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
         router.push('/login')
         return
       }
 
-      // 2️⃣ hämta area (EXAKT ID)
-      const { data: area, error: areaError } = await supabase
-        .from('areas')
-        .select('id')
-        .eq('id', params.id)
-        .single()
-
-      if (areaError || !area) {
-        setLoading(false)
-        return
-      }
-
-      // 3️⃣ hämta channels för denna area
-      const { data: channelData } = await supabase
+      const { data, error } = await supabase
         .from('channels')
-        .select('*')
-        .eq('area_id', area.id)
+        .select('id, name')
+        .eq('area_id', params.id)
         .order('created_at', { ascending: true })
 
-      setChannels(channelData || [])
+      if (error) {
+        console.error(error)
+      }
+
+      setChannels(data || [])
       setLoading(false)
     }
 
@@ -54,17 +44,13 @@ export default function AreaPage({ params }: { params: { id: string } }) {
     return <p style={{ padding: 20 }}>Loading…</p>
   }
 
-  if (!channels.length) {
-    return (
-      <main style={{ padding: 40 }}>
-        <h2>No channels found</h2>
-      </main>
-    )
-  }
-
   return (
     <main style={{ maxWidth: 800, margin: '40px auto' }}>
       <h2>Channels</h2>
+
+      {channels.length === 0 && (
+        <p style={{ color: '#777' }}>No channels found</p>
+      )}
 
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {channels.map(channel => (
