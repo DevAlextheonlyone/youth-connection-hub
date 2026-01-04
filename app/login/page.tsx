@@ -2,8 +2,10 @@
 
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -14,7 +16,13 @@ export default function LoginPage() {
       email,
       password,
     })
-    if (error) alert(error.message)
+
+    if (error) {
+      alert(error.message)
+    } else {
+      router.push('/') // 👉 SKICKA TILL FORUMET
+    }
+
     setLoading(false)
   }
 
@@ -24,7 +32,13 @@ export default function LoginPage() {
       email,
       password,
     })
-    if (error) alert(error.message)
+
+    if (error) {
+      alert(error.message)
+    } else {
+      router.push('/') // 👉 SKICKA TILL FORUMET
+    }
+
     setLoading(false)
   }
 
@@ -98,11 +112,8 @@ export default function LoginPage() {
         Forgot password?
       </button>
 
-      {/* Discord support */}
       <div style={{ marginTop: 40 }}>
-        <p style={{ marginBottom: 10, color: '#666' }}>
-          Need help or support?
-        </p>
+        <p style={{ color: '#666' }}>Need help or support?</p>
         <a
           href="https://discord.gg/ptm4PrDUrB"
           target="_blank"
@@ -121,26 +132,18 @@ export default function LoginPage() {
         </a>
       </div>
 
-      {/* PayPal donation */}
-      <div style={{ marginTop: 35 }}>
-        <p style={{ fontSize: 14, color: '#777', marginBottom: 8 }}>
-          Want to support the project?
-        </p>
-        <p style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>
-          Donations are completely optional and help keep the project running.
+      <div style={{ marginTop: 30 }}>
+        <p style={{ fontSize: 12, color: '#999' }}>
+          Donations are completely optional
         </p>
         <a
           href="https://www.paypal.com/donate"
           target="_blank"
           rel="noopener noreferrer"
           style={{
-            display: 'inline-block',
-            padding: '8px 18px',
-            border: '1px solid #ddd',
-            borderRadius: 6,
-            textDecoration: 'none',
-            color: '#000',
             fontSize: 14,
+            textDecoration: 'underline',
+            color: '#000',
           }}
         >
           Donate via PayPal
