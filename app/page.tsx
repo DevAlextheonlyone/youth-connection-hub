@@ -1,7 +1,9 @@
-import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import { createSupabaseServer } from '@/lib/supabase-server'
 
 export default async function HomePage() {
+  const supabase = createSupabaseServer()
+
   const { data: areas } = await supabase
     .from('areas')
     .select('*')

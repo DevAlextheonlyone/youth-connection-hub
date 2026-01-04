@@ -1,11 +1,13 @@
-import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import { createSupabaseServer } from '@/lib/supabase-server'
 
 export default async function AreaPage({
   params,
 }: {
   params: { id: string }
 }) {
+  const supabase = createSupabaseServer()
+
   const { data: area } = await supabase
     .from('areas')
     .select('*')
@@ -29,7 +31,7 @@ export default async function AreaPage({
         Choose a channel
       </p>
 
-      {(!channels || channels.length === 0) ? (
+      {!channels || channels.length === 0 ? (
         <p>No channels yet.</p>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0 }}>
