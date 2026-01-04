@@ -46,7 +46,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main style={{ maxWidth: 400, margin: '100px auto', textAlign: 'center' }}>
+    <main style={{ maxWidth: 420, margin: '100px auto', textAlign: 'center' }}>
       <h1>Youth Connection Hub</h1>
 
       <p style={{ color: '#666', marginBottom: 30 }}>
@@ -118,6 +118,32 @@ export default function LoginPage() {
           }}
         >
           Join our Discord
+        </a>
+      </div>
+
+      {/* PayPal donation */}
+      <div style={{ marginTop: 35 }}>
+        <p style={{ fontSize: 14, color: '#777', marginBottom: 8 }}>
+          Want to support the project?
+        </p>
+        <p style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>
+          Donations are completely optional and help keep the project running.
+        </p>
+        <a
+          href="https://www.paypal.com/donate"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-block',
+            padding: '8px 18px',
+            border: '1px solid #ddd',
+            borderRadius: 6,
+            textDecoration: 'none',
+            color: '#000',
+            fontSize: 14,
+          }}
+        >
+          Donate via PayPal
         </a>
       </div>
     </main>
