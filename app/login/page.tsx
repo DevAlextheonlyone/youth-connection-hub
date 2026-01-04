@@ -28,6 +28,23 @@ export default function LoginPage() {
     setLoading(false)
   }
 
+  async function resetPassword() {
+    if (!email) {
+      alert('Enter your email first')
+      return
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://youth-connection-hub.vercel.app/reset-password',
+    })
+
+    if (error) {
+      alert(error.message)
+    } else {
+      alert('Password reset email sent')
+    }
+  }
+
   return (
     <main style={{ maxWidth: 400, margin: '100px auto', textAlign: 'center' }}>
       <h1>Youth Connection Hub</h1>
@@ -47,14 +64,34 @@ export default function LoginPage() {
         style={{ width: '100%', padding: 10, marginBottom: 20 }}
       />
 
-      <button onClick={signIn} disabled={loading} style={{ width: '100%', padding: 10 }}>
+      <button
+        onClick={signIn}
+        disabled={loading}
+        style={{ width: '100%', padding: 10 }}
+      >
         Sign In
       </button>
 
-      <p>or</p>
-
-      <button onClick={signUp} disabled={loading} style={{ width: '100%', padding: 10 }}>
+      <button
+        onClick={signUp}
+        disabled={loading}
+        style={{ width: '100%', padding: 10, marginTop: 10 }}
+      >
         Sign Up
+      </button>
+
+      <button
+        onClick={resetPassword}
+        disabled={loading}
+        style={{
+          width: '100%',
+          padding: 10,
+          marginTop: 20,
+          background: '#333',
+          color: '#fff',
+        }}
+      >
+        Forgot password?
       </button>
     </main>
   )
