@@ -7,7 +7,8 @@ import { useRouter, useParams } from 'next/navigation'
 type Post = {
   id: string
   content: string
-  image_url: string | null
+  image_path: string | null
+  image_url?: string | null
   created_at: string
   user_id: string
 }
@@ -22,6 +23,7 @@ export default function ChannelPage() {
   const [image, setImage] = useState<File | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // 🔹 Hämta posts första gången
   useEffect(() => {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession()
@@ -30,24 +32,46 @@ export default function ChannelPage() {
         return
       }
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('posts')
         .select('*')
         .eq('channel_id', channelId)
         .order('created_at', { ascending: false })
 
-      setPosts(data || [])
+      if (error) {
+        console.error(error)
+        setLoading(false)
+        return
+      }
+
+      // 🔐 skapa signed URLs för bilder
+      const postsWithImages = await Promise.all(
+        (data || []).map(async post => {
+          if (!post.image_path) return post
+
+          const { data: signed } = await supabase.storage
+            .from('images')
+            .createSignedUrl(post.image_path, 60 * 60)
+
+          return {
+            ...post,
+            image_url: signed?.signedUrl || null,
+          }
+        })
+      )
+
+      setPosts(postsWithImages)
       setLoading(false)
     }
 
     if (channelId) load()
   }, [channelId, router])
 
-  // 🔥 realtime
+  // 🔥 REALTIME – lyssna på nya posts
   useEffect(() => {
     if (!channelId) return
 
-    const channel = supabase
+    const realtimeChannel = supabase
       .channel(`posts-${channelId}`)
       .on(
         'postgres_changes',
@@ -57,14 +81,24 @@ export default function ChannelPage() {
           table: 'posts',
           filter: `channel_id=eq.${channelId}`,
         },
-        payload => {
-          setPosts(prev => [payload.new as Post, ...prev])
+        async payload => {
+          const post = payload.new as Post
+
+          if (post.image_path) {
+            const { data: signed } = await supabase.storage
+              .from('images')
+              .createSignedUrl(post.image_path, 60 * 60)
+
+            post.image_url = signed?.signedUrl || null
+          }
+
+          setPosts(prev => [post, ...prev])
         }
       )
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(realtimeChannel)
     }
   }, [channelId])
 
@@ -74,30 +108,35 @@ export default function ChannelPage() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
 
-    let imageUrl: string | null = null
+    let imagePath: string | null = null
 
     if (image) {
-      const fileExt = image.name.split('.').pop()
-      const fileName = `${crypto.randomUUID()}.${fileExt}`
+      const ext = image.name.split('.').pop()
+      const fileName = `${crypto.randomUUID()}.${ext}`
 
       const { error } = await supabase.storage
         .from('images')
         .upload(fileName, image)
 
-      if (!error) {
-        const { data } = supabase.storage
-          .from('images')
-          .getPublicUrl(fileName)
-        imageUrl = data.publicUrl
+      if (error) {
+        alert('Image upload failed')
+        return
       }
+
+      imagePath = fileName
     }
 
-    await supabase.from('posts').insert({
+    const { error } = await supabase.from('posts').insert({
       channel_id: channelId,
       user_id: session.user.id,
       content,
-      image_url: imageUrl,
+      image_path: imagePath,
     })
+
+    if (error) {
+      alert('Post failed')
+      return
+    }
 
     setContent('')
     setImage(null)
@@ -140,7 +179,11 @@ export default function ChannelPage() {
               <img
                 src={post.image_url}
                 alt="Post image"
-                style={{ maxWidth: '100%', marginTop: 8, borderRadius: 6 }}
+                style={{
+                  maxWidth: '100%',
+                  marginTop: 8,
+                  borderRadius: 6,
+                }}
               />
             )}
 
