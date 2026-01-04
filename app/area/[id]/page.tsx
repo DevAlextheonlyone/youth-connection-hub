@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
 type Channel = {
@@ -10,14 +10,16 @@ type Channel = {
   name: string
 }
 
-export default function AreaPage({ params }: { params: { id?: string } }) {
+export default function AreaPage() {
   const router = useRouter()
+  const params = useParams()
+  const areaId = params.id as string
+
   const [channels, setChannels] = useState<Channel[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
-      const areaId = params?.id
       console.log('AREA ID PARAM', areaId)
 
       if (!areaId) {
@@ -49,7 +51,7 @@ export default function AreaPage({ params }: { params: { id?: string } }) {
     }
 
     load()
-  }, [params, router])
+  }, [areaId, router])
 
   if (loading) return <p style={{ padding: 20 }}>Loading…</p>
 
