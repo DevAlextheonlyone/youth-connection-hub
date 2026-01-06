@@ -26,13 +26,15 @@ export default function ChannelPage() {
 
   const [posts, setPosts] = useState<Post[]>([])
   const [profiles, setProfiles] = useState<Record<string, Profile>>({})
-  const [myProfile, setMyProfile] = useState<Profile | null>(null)
+  const [me, setMe] = useState<Profile | null>(null)
 
   const [content, setContent] = useState('')
   const [image, setImage] = useState<File | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingText, setEditingText] = useState('')
   const [loading, setLoading] = useState(true)
 
-  // 🔹 Initial load
+  // initial load
   useEffect(() => {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession()
@@ -41,23 +43,20 @@ export default function ChannelPage() {
         return
       }
 
-      // my profile
-      const { data: me } = await supabase
+      const { data: myProfile } = await supabase
         .from('profiles')
         .select('id, username, role')
         .eq('id', session.user.id)
         .single()
 
-      setMyProfile(me)
+      setMe(myProfile)
 
-      // posts
       const { data: postsData } = await supabase
         .from('posts')
         .select('*')
         .eq('channel_id', channelId)
         .order('created_at', { ascending: false })
 
-      // load profiles for posts
       const userIds = [...new Set((postsData || []).map(p => p.user_id))]
       const { data: profileRows } = await supabase
         .from('profiles')
@@ -68,7 +67,6 @@ export default function ChannelPage() {
       profileRows?.forEach(p => (map[p.id] = p))
       setProfiles(map)
 
-      // signed URLs
       const withImages = await Promise.all(
         (postsData || []).map(async post => {
           if (!post.image_path) return post
@@ -87,9 +85,7 @@ export default function ChannelPage() {
   }, [channelId, router])
 
   const canModerate =
-    myProfile?.role === 'owner' ||
-    myProfile?.role === 'admin' ||
-    myProfile?.role === 'mod'
+    me?.role === 'owner' || me?.role === 'admin' || me?.role === 'mod'
 
   function badge(role?: string) {
     if (role === 'owner') return '👑'
@@ -100,17 +96,15 @@ export default function ChannelPage() {
 
   async function createPost() {
     if (!content.trim() && !image) return
-
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
 
     let imagePath: string | null = null
-
     if (image) {
       const ext = image.name.split('.').pop()
-      const fileName = `${crypto.randomUUID()}.${ext}`
-      await supabase.storage.from('images').upload(fileName, image)
-      imagePath = fileName
+      const name = `${crypto.randomUUID()}.${ext}`
+      await supabase.storage.from('images').upload(name, image)
+      imagePath = name
     }
 
     await supabase.from('posts').insert({
@@ -127,6 +121,13 @@ export default function ChannelPage() {
   async function deletePost(id: string) {
     await supabase.from('posts').delete().eq('id', id)
     setPosts(p => p.filter(x => x.id !== id))
+  }
+
+  async function saveEdit(id: string) {
+    await supabase.from('posts').update({ content: editingText }).eq('id', id)
+    setPosts(p => p.map(x => (x.id === id ? { ...x, content: editingText } : x)))
+    setEditingId(null)
+    setEditingText('')
   }
 
   if (loading) return <p style={{ padding: 20 }}>Loading…</p>
@@ -159,13 +160,28 @@ export default function ChannelPage() {
                 <img src={post.image_url} style={{ maxWidth: '100%', borderRadius: 8, marginTop: 8 }} />
               )}
 
-              <p>{post.content}</p>
+              {editingId === post.id ? (
+                <>
+                  <textarea
+                    value={editingText}
+                    onChange={e => setEditingText(e.target.value)}
+                    style={{ width: '100%', minHeight: 60 }}
+                  />
+                  <button onClick={() => saveEdit(post.id)}>Save</button>
+                  <button onClick={() => setEditingId(null)}>Cancel</button>
+                </>
+              ) : (
+                <p>{post.content}</p>
+              )}
 
               <small>{new Date(post.created_at).toLocaleString()}</small>
 
               {canModerate && (
                 <div>
-                  <button onClick={() => deletePost(post.id)} style={{ color: 'red' }}>
+                  <button onClick={() => { setEditingId(post.id); setEditingText(post.content) }}>
+                    Edit
+                  </button>
+                  <button onClick={() => deletePost(post.id)} style={{ color: 'red', marginLeft: 8 }}>
                     Delete
                   </button>
                 </div>
