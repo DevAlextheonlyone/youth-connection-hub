@@ -15,6 +15,7 @@ type Post = {
 
 type Profile = {
   id: string
+  username: string | null
   role: 'owner' | 'admin' | 'mod' | 'user'
 }
 
@@ -24,7 +25,9 @@ export default function ChannelPage() {
   const channelId = params.id as string
 
   const [posts, setPosts] = useState<Post[]>([])
-  const [profile, setProfile] = useState<Profile | null>(null)
+  const [profiles, setProfiles] = useState<Record<string, Profile>>({})
+  const [myProfile, setMyProfile] = useState<Profile | null>(null)
+
   const [content, setContent] = useState('')
   const [image, setImage] = useState<File | null>(null)
   const [loading, setLoading] = useState(true)
@@ -38,14 +41,14 @@ export default function ChannelPage() {
         return
       }
 
-      // profile (role)
-      const { data: profileData } = await supabase
+      // my profile
+      const { data: me } = await supabase
         .from('profiles')
-        .select('id, role')
+        .select('id, username, role')
         .eq('id', session.user.id)
         .single()
 
-      setProfile(profileData)
+      setMyProfile(me)
 
       // posts
       const { data: postsData } = await supabase
@@ -54,19 +57,25 @@ export default function ChannelPage() {
         .eq('channel_id', channelId)
         .order('created_at', { ascending: false })
 
-      // signed URLs for images
+      // load profiles for posts
+      const userIds = [...new Set((postsData || []).map(p => p.user_id))]
+      const { data: profileRows } = await supabase
+        .from('profiles')
+        .select('id, username, role')
+        .in('id', userIds)
+
+      const map: Record<string, Profile> = {}
+      profileRows?.forEach(p => (map[p.id] = p))
+      setProfiles(map)
+
+      // signed URLs
       const withImages = await Promise.all(
         (postsData || []).map(async post => {
           if (!post.image_path) return post
-
           const { data } = await supabase.storage
             .from('images')
-            .createSignedUrl(post.image_path, 60 * 60)
-
-          return {
-            ...post,
-            image_url: data?.signedUrl || null,
-          }
+            .createSignedUrl(post.image_path, 3600)
+          return { ...post, image_url: data?.signedUrl || null }
         })
       )
 
@@ -77,40 +86,17 @@ export default function ChannelPage() {
     if (channelId) load()
   }, [channelId, router])
 
-  // 🔥 REALTIME – new posts
-  useEffect(() => {
-    if (!channelId) return
+  const canModerate =
+    myProfile?.role === 'owner' ||
+    myProfile?.role === 'admin' ||
+    myProfile?.role === 'mod'
 
-    const channel = supabase
-      .channel(`posts-${channelId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'posts',
-          filter: `channel_id=eq.${channelId}`,
-        },
-        async payload => {
-          const post = payload.new as Post
-
-          if (post.image_path) {
-            const { data } = await supabase.storage
-              .from('images')
-              .createSignedUrl(post.image_path, 60 * 60)
-
-            post.image_url = data?.signedUrl || null
-          }
-
-          setPosts(prev => [post, ...prev])
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [channelId])
+  function badge(role?: string) {
+    if (role === 'owner') return '👑'
+    if (role === 'admin') return '🛡️'
+    if (role === 'mod') return '🔑'
+    return ''
+  }
 
   async function createPost() {
     if (!content.trim() && !image) return
@@ -123,44 +109,25 @@ export default function ChannelPage() {
     if (image) {
       const ext = image.name.split('.').pop()
       const fileName = `${crypto.randomUUID()}.${ext}`
-
-      const { error } = await supabase.storage
-        .from('images')
-        .upload(fileName, image)
-
-      if (error) {
-        alert('Image upload failed')
-        return
-      }
-
+      await supabase.storage.from('images').upload(fileName, image)
       imagePath = fileName
     }
 
-    const { error } = await supabase.from('posts').insert({
+    await supabase.from('posts').insert({
       channel_id: channelId,
       user_id: session.user.id,
       content,
       image_path: imagePath,
     })
 
-    if (error) {
-      alert('Post failed')
-      return
-    }
-
     setContent('')
     setImage(null)
   }
 
-  async function deletePost(postId: string) {
-    await supabase.from('posts').delete().eq('id', postId)
-    setPosts(prev => prev.filter(p => p.id !== postId))
+  async function deletePost(id: string) {
+    await supabase.from('posts').delete().eq('id', id)
+    setPosts(p => p.filter(x => x.id !== id))
   }
-
-  const canModerate =
-    profile?.role === 'owner' ||
-    profile?.role === 'admin' ||
-    profile?.role === 'mod'
 
   if (loading) return <p style={{ padding: 20 }}>Loading…</p>
 
@@ -168,7 +135,6 @@ export default function ChannelPage() {
     <main style={{ maxWidth: 800, margin: '40px auto' }}>
       <h2>Posts</h2>
 
-      {/* create post */}
       <div style={{ marginBottom: 20 }}>
         <textarea
           placeholder="Write something…"
@@ -176,55 +142,37 @@ export default function ChannelPage() {
           onChange={e => setContent(e.target.value)}
           style={{ width: '100%', minHeight: 80, padding: 10 }}
         />
-
-        <input
-          type="file"
-          accept="image/*"
-          onChange={e => setImage(e.target.files?.[0] || null)}
-        />
-
-        <button onClick={createPost} style={{ marginTop: 8 }}>
-          Post
-        </button>
+        <input type="file" accept="image/*" onChange={e => setImage(e.target.files?.[0] || null)} />
+        <button onClick={createPost}>Post</button>
       </div>
 
-      {/* posts */}
       <ul style={{ listStyle: 'none', padding: 0 }}>
-        {posts.map(post => (
-          <li
-            key={post.id}
-            style={{ borderBottom: '1px solid #eee', padding: '12px 0' }}
-          >
-            {post.image_url && (
-              <img
-                src={post.image_url}
-                alt="Post image"
-                style={{
-                  maxWidth: '100%',
-                  borderRadius: 8,
-                  marginBottom: 8,
-                }}
-              />
-            )}
+        {posts.map(post => {
+          const p = profiles[post.user_id]
+          return (
+            <li key={post.id} style={{ borderBottom: '1px solid #eee', padding: '12px 0' }}>
+              <strong>
+                {p?.username || 'User'} {badge(p?.role)}
+              </strong>
 
-            <p style={{ margin: 0 }}>{post.content}</p>
+              {post.image_url && (
+                <img src={post.image_url} style={{ maxWidth: '100%', borderRadius: 8, marginTop: 8 }} />
+              )}
 
-            <small style={{ color: '#888' }}>
-              {new Date(post.created_at).toLocaleString()}
-            </small>
+              <p>{post.content}</p>
 
-            {canModerate && (
-              <div>
-                <button
-                  onClick={() => deletePost(post.id)}
-                  style={{ color: 'red', marginTop: 6 }}
-                >
-                  Delete
-                </button>
-              </div>
-            )}
-          </li>
-        ))}
+              <small>{new Date(post.created_at).toLocaleString()}</small>
+
+              {canModerate && (
+                <div>
+                  <button onClick={() => deletePost(post.id)} style={{ color: 'red' }}>
+                    Delete
+                  </button>
+                </div>
+              )}
+            </li>
+          )
+        })}
       </ul>
     </main>
   )
