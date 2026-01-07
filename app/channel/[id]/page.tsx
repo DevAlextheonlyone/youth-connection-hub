@@ -34,7 +34,6 @@ export default function ChannelPage() {
   const [editingText, setEditingText] = useState('')
   const [loading, setLoading] = useState(true)
 
-  // initial load
   useEffect(() => {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession()
@@ -118,6 +117,22 @@ export default function ChannelPage() {
     setImage(null)
   }
 
+  async function reportPost(postId: string) {
+    const reason = prompt('Why are you reporting this post?')
+    if (!reason) return
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
+    await supabase.from('reports').insert({
+      post_id: postId,
+      reported_by: session.user.id,
+      reason,
+    })
+
+    alert('Report sent. Thank you.')
+  }
+
   async function deletePost(id: string) {
     await supabase.from('posts').delete().eq('id', id)
     setPosts(p => p.filter(x => x.id !== id))
@@ -176,16 +191,28 @@ export default function ChannelPage() {
 
               <small>{new Date(post.created_at).toLocaleString()}</small>
 
-              {canModerate && (
-                <div>
-                  <button onClick={() => { setEditingId(post.id); setEditingText(post.content) }}>
-                    Edit
-                  </button>
-                  <button onClick={() => deletePost(post.id)} style={{ color: 'red', marginLeft: 8 }}>
-                    Delete
-                  </button>
-                </div>
-              )}
+              {/* 👇 REPORT – ALL USERS */}
+              <div style={{ marginTop: 6 }}>
+                <button onClick={() => reportPost(post.id)}>Report</button>
+
+                {/* 👇 MODERATION – ONLY MOD/ADMIN/OWNER */}
+                {canModerate && (
+                  <>
+                    <button
+                      onClick={() => { setEditingId(post.id); setEditingText(post.content) }}
+                      style={{ marginLeft: 8 }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deletePost(post.id)}
+                      style={{ color: 'red', marginLeft: 8 }}
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
+              </div>
             </li>
           )
         })}
