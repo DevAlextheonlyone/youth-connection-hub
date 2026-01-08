@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation'
 type Report = {
   id: string
   post_id: string
-  reported_by: string
   reason: string
   created_at: string
 }
@@ -15,6 +14,7 @@ type Report = {
 type Post = {
   id: string
   content: string
+  channel_id: string
 }
 
 type Profile = {
@@ -49,7 +49,7 @@ export default function ModerationPage() {
 
       const { data: reportRows } = await supabase
         .from('reports')
-        .select('*')
+        .select('id, post_id, reason, created_at')
         .order('created_at', { ascending: false })
 
       const postIds = [...new Set((reportRows || []).map(r => r.post_id))]
@@ -57,7 +57,7 @@ export default function ModerationPage() {
       if (postIds.length > 0) {
         const { data: postRows } = await supabase
           .from('posts')
-          .select('id, content')
+          .select('id, content, channel_id')
           .in('id', postIds)
 
         const map: Record<string, Post> = {}
@@ -81,21 +81,35 @@ export default function ModerationPage() {
       {reports.length === 0 && <p>No reports yet.</p>}
 
       <ul style={{ listStyle: 'none', padding: 0 }}>
-        {reports.map(r => (
-          <li
-            key={r.id}
-            style={{ borderBottom: '1px solid #ddd', padding: '12px 0' }}
-          >
-            <p><strong>Reason:</strong> {r.reason}</p>
+        {reports.map(r => {
+          const post = posts[r.post_id]
 
-            <p>
-              <strong>Post:</strong>{' '}
-              {posts[r.post_id]?.content || 'Post not found'}
-            </p>
+          return (
+            <li
+              key={r.id}
+              style={{ borderBottom: '1px solid #ddd', padding: '12px 0' }}
+            >
+              <p><strong>Reason:</strong> {r.reason}</p>
 
-            <small>{new Date(r.created_at).toLocaleString()}</small>
-          </li>
-        ))}
+              <p>
+                <strong>Post:</strong>{' '}
+                {post?.content || 'Post not found'}
+              </p>
+
+              {post && (
+                <a
+                  href={`/channel/${post.channel_id}`}
+                  style={{ color: '#0070f3' }}
+                >
+                  Go to channel
+                </a>
+              )}
+
+              <br />
+              <small>{new Date(r.created_at).toLocaleString()}</small>
+            </li>
+          )
+        })}
       </ul>
     </main>
   )
