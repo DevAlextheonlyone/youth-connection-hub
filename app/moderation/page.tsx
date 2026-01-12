@@ -24,11 +24,6 @@ type Notification = {
   read: boolean
 }
 
-type Profile = {
-  id: string
-  role: 'owner' | 'admin' | 'mod' | 'user'
-}
-
 export default function ModerationPage() {
   const router = useRouter()
   const [reports, setReports] = useState<Report[]>([])
@@ -46,7 +41,7 @@ export default function ModerationPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('id, role')
+        .select('role')
         .eq('id', session.user.id)
         .single()
 
@@ -55,15 +50,12 @@ export default function ModerationPage() {
         return
       }
 
-      // notifications
       const { data: notifRows } = await supabase
         .from('mod_notifications')
         .select('*')
-        .order('created_at', { ascending: false })
 
       setNotifications(notifRows || [])
 
-      // reports
       const { data: reportRows } = await supabase
         .from('reports')
         .select('*')
@@ -71,7 +63,6 @@ export default function ModerationPage() {
 
       setReports(reportRows || [])
 
-      // posts for reports
       const postIds = [...new Set((reportRows || []).map(r => r.post_id))]
 
       if (postIds.length > 0) {
@@ -91,91 +82,86 @@ export default function ModerationPage() {
     load()
   }, [router])
 
-  async function markAllRead() {
-    await supabase
-      .from('mod_notifications')
-      .update({ read: true })
-      .eq('read', false)
-
-    setNotifications(n => n.map(x => ({ ...x, read: true })))
+  async function deletePost(postId: string) {
+    if (!confirm('Delete this post?')) return
+    await supabase.from('posts').delete().eq('id', postId)
+    setPosts(p => {
+      const copy = { ...p }
+      delete copy[postId]
+      return copy
+    })
   }
 
-  const unreadCount = notifications.filter(n => !n.read).length
+  async function toggleHidden(postId: string, hidden: boolean) {
+    await supabase.from('posts').update({ hidden: !hidden }).eq('id', postId)
+    setPosts(p => ({
+      ...p,
+      [postId]: { ...p[postId], hidden: !hidden }
+    }))
+  }
+
+  async function markReportRead(reportId: string) {
+    await supabase.from('mod_notifications').update({ read: true }).eq('report_id', reportId)
+    setNotifications(n =>
+      n.map(x => x.report_id === reportId ? { ...x, read: true } : x)
+    )
+  }
 
   if (loading) return <p style={{ padding: 20 }}>Loading…</p>
 
   return (
     <main style={{ maxWidth: 1000, margin: '40px auto' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>
-          Moderation
-          {unreadCount > 0 && (
-            <span style={{
-              marginLeft: 10,
-              background: 'red',
-              color: 'white',
-              borderRadius: 12,
-              padding: '2px 8px',
-              fontSize: 12
-            }}>
-              {unreadCount}
-            </span>
-          )}
-        </h2>
+      <h2>Moderation</h2>
 
-        {unreadCount > 0 && (
-          <button onClick={markAllRead}>
-            Mark all as read
-          </button>
-        )}
-      </header>
+      {reports.map(r => {
+        const post = posts[r.post_id]
+        const notif = notifications.find(n => n.report_id === r.id)
 
-      {reports.length === 0 && <p>No reports.</p>}
+        return (
+          <div
+            key={r.id}
+            style={{
+              border: '1px solid #ddd',
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 16,
+              background: notif?.read ? '#fafafa' : '#fff3f3'
+            }}
+          >
+            <p><strong>Reason:</strong> {r.reason}</p>
+            <p><strong>Post:</strong> {post?.content || 'Post not found'}</p>
 
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {reports.map(r => {
-          const post = posts[r.post_id]
-          return (
-            <li
-              key={r.id}
-              style={{
-                border: '1px solid #ddd',
-                borderRadius: 8,
-                padding: 16,
-                marginBottom: 16,
-                background: '#fafafa'
-              }}
-            >
-              <p><strong>Reason:</strong> {r.reason}</p>
+            {post && (
+              <>
+                <p>Status: {post.hidden ? 'Hidden' : 'Visible'}</p>
 
-              <p>
-                <strong>Post:</strong>{' '}
-                {post?.content || 'Post not found'}
-              </p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <a href={`/channel/${post.channel_id}`}>Go to channel</a>
 
-              {post && (
-                <>
-                  <p>
-                    <strong>Status:</strong>{' '}
-                    {post.hidden ? 'Hidden' : 'Visible'}
-                  </p>
+                  <button onClick={() => toggleHidden(post.id, post.hidden)}>
+                    {post.hidden ? 'Unhide' : 'Hide'}
+                  </button>
 
-                  <a
-                    href={`/channel/${post.channel_id}`}
-                    style={{ color: '#0070f3' }}
+                  <button
+                    onClick={() => deletePost(post.id)}
+                    style={{ color: 'red' }}
                   >
-                    Go to channel
-                  </a>
-                </>
-              )}
+                    Delete
+                  </button>
 
-              <p style={{ fontSize: 12, color: '#666' }}>
-                {new Date(r.created_at).toLocaleString()}
-              </p>
-            </li>
-          )
-        })}
-      </ul>
+                  {!notif?.read && (
+                    <button onClick={() => markReportRead(r.id)}>
+                      Mark as read
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+
+            <small>{new Date(r.created_at).toLocaleString()}</small>
+          </div>
+        )
+      })}
     </main>
   )
 }
