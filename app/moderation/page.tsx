@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import ThemeToggle from '@/components/ThemeToggle'
 
 type Report = {
   id: string
@@ -101,9 +102,15 @@ export default function ModerationPage() {
   }
 
   async function markReportRead(reportId: string) {
-    await supabase.from('mod_notifications').update({ read: true }).eq('report_id', reportId)
+    await supabase
+      .from('mod_notifications')
+      .update({ read: true })
+      .eq('report_id', reportId)
+
     setNotifications(n =>
-      n.map(x => x.report_id === reportId ? { ...x, read: true } : x)
+      n.map(x =>
+        x.report_id === reportId ? { ...x, read: true } : x
+      )
     )
   }
 
@@ -111,8 +118,20 @@ export default function ModerationPage() {
 
   return (
     <main style={{ maxWidth: 1000, margin: '40px auto' }}>
-      <h2>Moderation</h2>
+      {/* HEADER */}
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 24,
+        }}
+      >
+        <h2>Moderation</h2>
+        <ThemeToggle />
+      </header>
 
+      {/* REPORTS */}
       {reports.map(r => {
         const post = posts[r.post_id]
         const notif = notifications.find(n => n.report_id === r.id)
@@ -121,11 +140,11 @@ export default function ModerationPage() {
           <div
             key={r.id}
             style={{
-              border: '1px solid #ddd',
+              border: '1px solid var(--border)',
               borderRadius: 8,
               padding: 16,
               marginBottom: 16,
-              background: notif?.read ? '#fafafa' : '#fff3f3'
+              background: notif?.read ? 'var(--card)' : '#3f1d1d',
             }}
           >
             <p><strong>Reason:</strong> {r.reason}</p>
@@ -144,7 +163,7 @@ export default function ModerationPage() {
 
                   <button
                     onClick={() => deletePost(post.id)}
-                    style={{ color: 'red' }}
+                    style={{ color: 'var(--danger)' }}
                   >
                     Delete
                   </button>

@@ -24,3 +24,25 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+:root {
+  --bg: #ffffff;
+  --text: #111111;
+  --card: #f7f7f7;
+  --border: #e5e5e5;
+  --primary: #2563eb;
+  --danger: #dc2626;
+}
+
+[data-theme='dark'] {
+  --bg: #0b0f14;
+  --text: #e5e7eb;
+  --card: #111827;
+  --border: #1f2937;
+  --primary: #60a5fa;
+  --danger: #f87171;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
