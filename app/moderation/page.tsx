@@ -15,6 +15,13 @@ type Post = {
   id: string
   content: string
   channel_id: string
+  hidden: boolean
+}
+
+type Notification = {
+  id: string
+  report_id: string
+  read: boolean
 }
 
 type Profile = {
@@ -26,6 +33,7 @@ export default function ModerationPage() {
   const router = useRouter()
   const [reports, setReports] = useState<Report[]>([])
   const [posts, setPosts] = useState<Record<string, Post>>({})
+  const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -47,17 +55,29 @@ export default function ModerationPage() {
         return
       }
 
-      const { data: reportRows } = await supabase
-        .from('reports')
-        .select('id, post_id, reason, created_at')
+      // notifications
+      const { data: notifRows } = await supabase
+        .from('mod_notifications')
+        .select('*')
         .order('created_at', { ascending: false })
 
+      setNotifications(notifRows || [])
+
+      // reports
+      const { data: reportRows } = await supabase
+        .from('reports')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      setReports(reportRows || [])
+
+      // posts for reports
       const postIds = [...new Set((reportRows || []).map(r => r.post_id))]
 
       if (postIds.length > 0) {
         const { data: postRows } = await supabase
           .from('posts')
-          .select('id, content, channel_id')
+          .select('id, content, channel_id, hidden')
           .in('id', postIds)
 
         const map: Record<string, Post> = {}
@@ -65,29 +85,66 @@ export default function ModerationPage() {
         setPosts(map)
       }
 
-      setReports(reportRows || [])
       setLoading(false)
     }
 
     load()
   }, [router])
 
+  async function markAllRead() {
+    await supabase
+      .from('mod_notifications')
+      .update({ read: true })
+      .eq('read', false)
+
+    setNotifications(n => n.map(x => ({ ...x, read: true })))
+  }
+
+  const unreadCount = notifications.filter(n => !n.read).length
+
   if (loading) return <p style={{ padding: 20 }}>Loading…</p>
 
   return (
-    <main style={{ maxWidth: 900, margin: '40px auto' }}>
-      <h2>Moderation – Reports</h2>
+    <main style={{ maxWidth: 1000, margin: '40px auto' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2>
+          Moderation
+          {unreadCount > 0 && (
+            <span style={{
+              marginLeft: 10,
+              background: 'red',
+              color: 'white',
+              borderRadius: 12,
+              padding: '2px 8px',
+              fontSize: 12
+            }}>
+              {unreadCount}
+            </span>
+          )}
+        </h2>
 
-      {reports.length === 0 && <p>No reports yet.</p>}
+        {unreadCount > 0 && (
+          <button onClick={markAllRead}>
+            Mark all as read
+          </button>
+        )}
+      </header>
+
+      {reports.length === 0 && <p>No reports.</p>}
 
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {reports.map(r => {
           const post = posts[r.post_id]
-
           return (
             <li
               key={r.id}
-              style={{ borderBottom: '1px solid #ddd', padding: '12px 0' }}
+              style={{
+                border: '1px solid #ddd',
+                borderRadius: 8,
+                padding: 16,
+                marginBottom: 16,
+                background: '#fafafa'
+              }}
             >
               <p><strong>Reason:</strong> {r.reason}</p>
 
@@ -97,16 +154,24 @@ export default function ModerationPage() {
               </p>
 
               {post && (
-                <a
-                  href={`/channel/${post.channel_id}`}
-                  style={{ color: '#0070f3' }}
-                >
-                  Go to channel
-                </a>
+                <>
+                  <p>
+                    <strong>Status:</strong>{' '}
+                    {post.hidden ? 'Hidden' : 'Visible'}
+                  </p>
+
+                  <a
+                    href={`/channel/${post.channel_id}`}
+                    style={{ color: '#0070f3' }}
+                  >
+                    Go to channel
+                  </a>
+                </>
               )}
 
-              <br />
-              <small>{new Date(r.created_at).toLocaleString()}</small>
+              <p style={{ fontSize: 12, color: '#666' }}>
+                {new Date(r.created_at).toLocaleString()}
+              </p>
             </li>
           )
         })}
